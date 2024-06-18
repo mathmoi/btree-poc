@@ -9,3 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 ### Added
 
 - Created the project structure.
+- First commit of the proof of concept of a btree. Currently only support insertion.
+
+### Changed
+
+- The README.md file now explains what this project is about.
