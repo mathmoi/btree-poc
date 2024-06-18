@@ -4,7 +4,7 @@ This is my template for new C++ projects. It is deliberately simple, so that it 
 
 ## TODO
 
-- [ ] Choose a license and add it to the [LICENSE](LICENSE) file
+- [X] Choose a license and add it to the [LICENSE](LICENSE) file
 - [ ] Update the current [README.md](README.md) file to remove the template documentation and add your
       project documentations
 - [ ] Remove the adder exemples and replace them by your project.

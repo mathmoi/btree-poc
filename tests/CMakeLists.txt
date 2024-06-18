@@ -6,15 +6,15 @@ FetchContent_Declare(Catch2
 FetchContent_MakeAvailable(Catch2)
 
 # Create the target
-file(GLOB_RECURSE PROJECT_TESTS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
-add_executable(project-tests ${PROJECT_TESTS_SOURCES})
+file(GLOB_RECURSE BTREE_TESTS_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp")
+add_executable(btree-tests ${BTREE_TESTS_SOURCES})
 
 # Link libraries
-target_link_libraries(project-tests PRIVATE Catch2::Catch2WithMain
-                                            project-adder)
-add_dependencies(project-tests project-adder)
+target_link_libraries(btree-tests PRIVATE Catch2::Catch2WithMain
+                                          btree)
+add_dependencies(btree-tests btree)
 
 # Configure CTest
 include(CTest)
 include(Catch)
-catch_discover_tests(project-tests)
+catch_discover_tests(btree-tests)
