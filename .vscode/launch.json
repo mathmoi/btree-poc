@@ -2,43 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug avec LLDB",
-            "program": "${workspaceFolder}/build/tests/btree-tests",
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        },
-        {
-            "name": "LLDB Launch",
+            "name": "(ctest) Launch",
             "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/build/tests/btree-tests",
-            "args": [],
-            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",
-            "MIDebuggerPath": "/usr/bin/lldb",
-            "setupCommands": [
-              {
-                "description": "Enable pretty-printing for lldb",
-                "text": "-enable-pretty-printing",
-                "ignoreFailures": true
-              }
-            ],
-            "preLaunchTask": "CMake: build"
-          },
-          {
-            "name": "(gdb) Launch",
-            "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/tests/btree-tests",
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
+            "program": "${cmake.testProgram}",
+            "args": [ "${cmake.testArgs}" ],
             "MIMode": "gdb",
             "setupCommands": [
                 {
@@ -52,7 +21,6 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "CMake: build"
-          },
+        }
     ]
 }
