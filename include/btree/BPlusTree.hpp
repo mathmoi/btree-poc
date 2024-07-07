@@ -1,111 +1,158 @@
-#ifndef BTREE_B_PLUS_TREE_HPP_
-#define BTREE_B_PLUS_TREE_HPP_
+#ifndef BTREE_POC_BTREE_B_PLUS_TREE_HPP_
+#define BTREE_POC_BTREE_B_PLUS_TREE_HPP_
 
+#include "INode.hpp"
 #include "InternalNode.hpp"
 #include "LeafNode.hpp"
 
-#include <optional>
+#include <cstdint>
+#include <memory>
+#include <stack>
+#include <stdexcept>
 
-namespace btree
+namespace btreepoc::btree
 {
-    template<typename TKey, typename TValue, const int order>
+    // Represents a B+Tree.
+    template<typename TKey, typename TValue>
     class BPlusTree
     {
     public:
-        typedef LeafNode<TKey, TValue, order> LeafNodeType;
-        typedef InternalNode<TKey, order> InternalNodeType;
+        typedef std::uint32_t OrderType;
+        typedef std::shared_ptr<INode> NodePointer;
+        typedef LeafNode<TKey, TValue> LeafNodeType;
+        typedef InternalNode<TKey> InternalNodeType;
+        typedef std::shared_ptr<LeafNodeType> LeafNodePointer;
+        typedef std::shared_ptr<InternalNodeType> InternalNodePointer;
 
-        BPlusTree()
-        : root_(
-            std::make_shared<LeafNode<TKey, TValue, order>>()) // We create the btree with
-                                                               // an empty node because
-                                                               // that's the way it's
-                                                               // gonna be in mkvdb
+    public:
+        // Constructor.
+        inline BPlusTree(OrderType order)
+        : order_(order),
+          root_(std::make_shared<LeafNodeType>(order_))
         {
         }
 
-        void Insert(const TKey& key, const TValue& value)
+#ifdef BTREE_POC_UNIT_TESTS
+        // Special constructor for unit tests (TESTS ONLY).
+        inline BPlusTree(OrderType order, NodePointer root)
+        : order_(order),
+          root_(root)
         {
-            auto new_node = InsertInternal(root_, key, value);
-            if(new_node)
+        }
+
+        // Compare the keys of this b+tree and another one. This method is available only
+        // for unit tests.
+        //
+        // Returns true if they are equivalent, false otherwise.
+        bool CompareKeys(const BPlusTree<TKey, TValue>& other)
+        {
+            return root_->CompareKeys(*other.root_.get());
+        }
+#endif
+
+        // Insert a new key value pair in the tree. If the key is already present the
+        // insertion fail.
+        //
+        // Returns true if the insertion succeed, false otherwise.
+        inline bool Insert(const TKey& key, const TValue& value)
+        {
+            if(root_->is_leaf())
             {
-                auto new_root = std::make_shared<InternalNode<TKey, order>>();
-                new_root->Insert(root_, new_node->first, new_node->second);
-                root_ = new_root;
-            }
-        }
-
-        void Print(std::ostream& out) const
-        {
-            out << "digraph BTree {\n";
-            out << "node [shape=record];\n";
-            PrintInternal(root_, out);
-            out << "}\n";
-        }
-
-    private:
-        typename InternalNodeType::ChildPointer root_;
-
-        std::optional<std::pair<TKey, typename InternalNodeType::ChildPointer>>
-          InsertInternal(typename InternalNodeType::ChildPointer node,
-                         const TKey& key,
-                         const TValue& value)
-        {
-            if(node->is_leaf())
-            {
-                auto leaf = std::static_pointer_cast<LeafNode<TKey, TValue, order>>(node);
-                if(leaf->has_space())
+                auto leaf   = std::static_pointer_cast<LeafNodeType>(root_);
+                bool result = leaf->Insert({ key, value });
+                if(result)
                 {
-                    leaf->Insert(key, value);
-                    return std::nullopt;
+                    Balance(leaf, std::stack<InternalNodePointer>());
                 }
-                else
-                {
-                    auto new_node = leaf->Split();
-                    (key < new_node.first ? leaf : new_node.second)->Insert(key, value);
-                    return new_node;
-                }
+                return result;
             }
             else
             {
-                auto internal = std::static_pointer_cast<InternalNode<TKey, order>>(node);
-                auto child_node      = internal->FindChild(key);
-                auto maybe_new_child = InsertInternal(child_node, key, value);
-                if(maybe_new_child)
+                // TODO : Implement
+                throw new std::runtime_error("Not implemented yet");
+            }
+        }
+
+    private:
+        OrderType order_;
+        NodePointer root_;
+
+        // This methods balance the tree after an insertion or a deletion. It is higly
+        // inspired by Antonio Sarosi's implementation of mkdb.
+        //
+        // https://github.com/antoniosarosi/mkdb/blob/master/src/storage/btree.rs
+        //
+        inline void Balance(LeafNodePointer node, std::stack<InternalNodePointer> parents)
+        {
+            bool is_root = parents.empty();
+
+            if(is_root)
+            {
+                if(node->overflow())
                 {
-                    if(internal->has_space())
-                    {
-                        internal->Insert(maybe_new_child->first, maybe_new_child->second);
-                    }
-                    else
-                    {
-                        // If the current node has not space we need to split, then
-                        // insert, then return a new node again.
-                        auto new_node = internal->Split();
-                        (maybe_new_child->first < new_node.first ? internal
-                                                                 : new_node.second)
-                          ->Insert(maybe_new_child->first, maybe_new_child->second);
-                        return new_node;
-                    }
+                    // The root is overflowing. The root can't be split into more node.
+                    // What we will do is create a new empty root with the current root as
+                    // it's only child. Then we will procede to balance this child wich
+                    // will be splitted.
+                    //
+                    // Note: In our real implementation we might not be able to replace
+                    // the
+                    //       root node, because it will need to remain in the same
+                    //       position in the file. We will need to handle this, probablly
+                    //       by creating a new InternalNode using the same Page.
+                    auto new_root = std::make_shared<InternalNodeType>(order_);
+                    new_root->set_right_most_pointer(node);
+                    root_ = new_root;
+                    parents.push(new_root);
+                }
+                else
+                {
+                    return; // if the root underflow it's ok, no need to balance.
                 }
             }
 
-            return std::nullopt;
-        }
+            // Find in the parent the index of the cell pointing back at `node`.
+            // auto parent = std::static_pointer_cast<InternalNodeType>(parents.top());
 
-        void PrintInternal(typename InternalNodeType::ChildPointer node,
-                           std::ostream& out) const
-        {
-            node->Print(out);
-            if(InternalNodeType* internal = dynamic_cast<InternalNodeType*>(node.get()))
+            // We take a copy of all the cells that will need to be redistributed. We also
+            // remove the reference to to node from their parent. remove them from their
+            // nodes.
+            auto c = node->end() - node->begin();
+            std::vector<typename LeafNodeType::CellType> cells;
+            cells.reserve(node->size());
+            std::copy(node->begin(), node->end(), std::back_inserter(cells));
+
+            // We calculate how many node will be needed to store all the cells.
+            OrderType num_nodes = (cells.size() + order_ - 1) / order_;
+
+            // Create new nodes add cells in them and insert them into the parent.
+            auto next_cell = cells.begin();
+            for(auto node_index = 0u; node_index < num_nodes; ++node_index)
             {
-                for(std::uint32_t x = 0; x < internal->items_count() + 1; ++x)
+                // Distribute cells.size() elements into num_nodes nodes as evenly as
+                // possible. Buckets with lower indices (left-most) get one extra elements
+                // if needed.
+                auto cells_at_node =
+                  (cells.size() + num_nodes - node_index - 1) / num_nodes;
+                auto new_node = std::make_shared<LeafNodeType>(order_);
+                for(auto x = 0u; x < cells_at_node; ++x)
                 {
-                    PrintInternal(internal->GetChildAt(x), out);
+                    new_node->Insert(*(next_cell++));
+                }
+
+                // Insert the node in the parents. The last node must be the
+                // right-most-child.
+                if(node_index < num_nodes - 1)
+                {
+                    parents.top()->Insert({ new_node->back().key, new_node });
+                }
+                else
+                {
+                    parents.top()->set_right_most_pointer(new_node);
                 }
             }
         }
     };
-} // namespace btree
+} // namespace btreepoc::btree
 
-#endif // BTREE_B_PLUS_TREE_HPP_
+#endif // BTREE_POC_BTREE_B_PLUS_TREE_HPP_

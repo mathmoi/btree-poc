@@ -1,142 +1,90 @@
-#ifndef BTREE_INTERNAL_NODE_HPP_
-#define BTREE_INTERNAL_NODE_HPP_
+#ifndef BTREE_POC_BTREE_INTERNAL_NODE_HPP_
+#define BTREE_POC_BTREE_INTERNAL_NODE_HPP_
 
-#include "Node.hpp"
+#include "INode.hpp"
+#include "NodeBase.hpp"
 
-#include <array>
-#include <cassert>
 #include <memory>
 
-namespace btree
+namespace btreepoc::btree
 {
-    template<typename TKey, const int order>
-    class InternalNode : public Node<TKey, order>
+    // This class represents internal nodes in a b+tree. Internal nodes contains keys and
+    // pointer to children nodes that can be other internal node or leaf nodes.
+    template<typename TKey>
+    class InternalNode : public INode, public NodeBase<TKey, std::shared_ptr<INode>>
     {
     public:
-        typedef std::shared_ptr<Node<TKey, order>> ChildPointer;
-        typedef std::array<std::pair<TKey, ChildPointer>, Node<TKey, order>::MAX_KEYS>
-          ItemsArray;
+        typedef std::shared_ptr<INode> ChildPointer;
+        typedef NodeBase<TKey, ChildPointer> Base;
 
-        InternalNode()
-        : Node<TKey, order>(false)
+        // Constructor.
+        inline InternalNode(Base::SizeType order)
+        : Base(order)
         {
         }
 
-        TKey GetKeyAt(std::uint32_t index)
+        // Indicate if this node is a leaf node.
+        inline bool is_leaf() const { return false; };
+
+        // Indicate if the node is underflowing (has less cells than allowed for a node in
+        // a balanced tree)
+        inline bool underflow() const { return Base::underflow(); }
+
+        // Indicate if the node is overflowing (has more cells than allowed for a node in
+        // a balanced tree)
+        inline bool overflow() const { return Base::overflow(); }
+
+        // Returns the right-most-pointer.
+        inline ChildPointer right_most_pointer() const { return right_most_pointer_; }
+
+        // Set the right-most-pointer.
+        inline void set_right_most_pointer(ChildPointer pointer)
         {
-            assert(index < this->items_count_);
-            return items_[index].first;
+            right_most_pointer_ = pointer;
         }
 
-        ChildPointer GetChildAt(std::uint32_t index) const
+#ifdef BTREE_POC_UNIT_TESTS
+        // Compare the keys of this node and an other node. This method is available only
+        // for unit tests.
+        //
+        // Returns true if they are equivalent, false otherwise.
+        bool CompareKeys(const INode& other)
         {
-            assert(index <= this->items_count_);
-
-            // If the index is zero we need to return the left most pointer.
-            if(0 == index)
+            auto other_internal = dynamic_cast<const InternalNode<TKey>*>(&other);
+            if(!other_internal)
             {
-                return left_most_child_;
+                return false;
             }
 
-            return items_[index - 1].second;
-        }
-
-        // TODO : Introduce a type for a key/child pair (maybe InternalNode::Cell)
-        // returns the key that split de nodes and the new node.
-        std::pair<TKey, std::shared_ptr<InternalNode<TKey, order>>> Split()
-        {
-            auto new_node  = std::make_shared<InternalNode<TKey, order>>();
-            auto mid_index = this->items_count_ / 2;
-            TKey mid_key   = items_[mid_index].first;
-
-            std::copy(items_.begin() + mid_index + 1,
-                      items_.end(),
-                      new_node->items_.begin());
-            new_node->left_most_child_ = items_[mid_index].second;
-            new_node->items_count_     = this->items_count_ - mid_index - 1;
-            this->items_count_         = mid_index;
-
-            return std::make_pair(mid_key, new_node);
-        }
-
-        void Insert(ChildPointer left_child, TKey key, ChildPointer right_child)
-        {
-            assert(left_child);
-            assert(right_child);
-            assert(this->items_count_ == 0);
-
-            left_most_child_   = left_child;
-            items_[0]          = std::make_pair(key, right_child);
-            this->items_count_ = 1;
-        }
-
-        // The new_child must be the upper part of a split of an existing children of the
-        // current node. This way, the lower part is already a child of the current node
-        // and we only need to find the new node after the existing lower part. This means
-        // that the new child, can never be placed in the left_most_child even when it's
-        // the left_most_child that was split.
-        void Insert(TKey new_key, ChildPointer new_child)
-        {
-            assert(new_child);
-            assert(this->has_space());
-
-            auto [index, found] = this->SearchKeyIndex(new_key);
-            assert(!found); // We do not support duplicate keys.
-
-            std::copy_backward(items_.begin() + index,
-                               items_.begin() + this->items_count_,
-                               items_.begin() + this->items_count_ + 1);
-            ++this->items_count_;
-
-            items_[index] = std::make_pair(new_key, new_child);
-        }
-
-        ChildPointer FindChild(const TKey& key)
-        {
-            auto [index, found] = this->SearchKeyIndex(key);
-
-            // If we found the exact key we need to return the child at the next index
-            index += found ? 1 : 0;
-
-            return GetChildAt(index);
-        }
-
-        void Print(std::ostream& out) const
-        {
-            out << "node" << this->id() << " [label=\"";
-            for(std::uint32_t x = 0; x < this->items_count_; ++x)
+            if(this->size() != other_internal->size())
             {
-                out << "<f" << x * 2 << "> |<f" << x * 2 + 1 << "> " << items_[x].first
-                    << " |";
+                return false;
             }
-            out << "<f" << this->items_count_ * 2 << "> \"];\n";
 
-            for(std::uint32_t x = 0; x < this->items_count_ + 1; ++x)
+            auto it_this  = this->begin();
+            auto it_other = other_internal->begin();
+            while(it_this < this->end())
             {
-                out << "node" << this->id() << ":f" << x * 2 << " -> node"
-                    << GetChildAt(x)->id() << ";\n";
+                if(!it_this->value->CompareKeys(*it_other->value))
+                {
+                    return false;
+                }
+                it_this++;
+                it_other++;
             }
-        }
+
+            if(!right_most_pointer_->CompareKeys(*other_internal->right_most_pointer_))
+            {
+                return false;
+            }
+
+            return Base::CompareKeys(*static_cast<const Base*>(other_internal));
+        };
+#endif
 
     private:
-        /*void SetChildAt(std::uint32_t index, ChildPointer child)
-        {
-            assert(index <= this->items_count_);
+        ChildPointer right_most_pointer_;
+    }; // namespace btreepoc::btree
+} // namespace btreepoc::btree
 
-            // If the index is past the list of items, we need to set the right  most
-        child. if (this->items_count_ == index)
-            {
-                left_most_child_ = child;
-            }
-            else
-            {
-                items_[index].second = child;
-            }
-        }*/
-
-        ItemsArray items_;
-        ChildPointer left_most_child_;
-    };
-} // namespace btree
-
-#endif // BTREE_INTERNAL_NODE_HPP_
+#endif // BTREE_POC_BTREE_INTERNAL_NODE_HPP_
