@@ -4,6 +4,7 @@
 #include "INode.hpp"
 #include "NodeBase.hpp"
 
+#include <cassert>
 #include <memory>
 
 namespace btreepoc::btree
@@ -41,6 +42,34 @@ namespace btreepoc::btree
         inline void set_right_most_pointer(ChildPointer pointer)
         {
             right_most_pointer_ = pointer;
+        }
+
+        // Find the child of the node that may contains a given key.
+        inline ChildPointer FindChildContainsKey(const TKey& key) const
+        {
+            auto [found, it] = this->FindIterator(key);
+            if(it < this->end())
+            {
+                return it->value;
+            }
+            return right_most_pointer_;
+        }
+
+        // Find the index of a specified child. This method should not be called if the
+        // child is not really a children of the node.
+        inline Base::SizeType FindChildIndex(const ChildPointer child)
+        {
+            auto it = std::find_if(this->begin(),
+                                   this->end(),
+                                   [child](typename Base::CellType cell)
+                                   { return cell.value == child; });
+            if(it < this->end())
+            {
+                return it - this->begin();
+            }
+
+            assert(right_most_pointer_ == child);
+            return this->size();
         }
 
 #ifdef BTREE_POC_UNIT_TESTS

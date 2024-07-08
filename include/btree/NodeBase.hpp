@@ -57,7 +57,7 @@ namespace btreepoc::btree
         // Returns true if the insertion succed, false otherwise.
         inline bool Insert(const CellType& cell)
         {
-            auto find_result = FindIndex(cell.key);
+            auto find_result = FindIterator(cell.key);
             if(find_result.found)
             {
                 // The key is already present, we cannot insert.
@@ -107,19 +107,12 @@ namespace btreepoc::btree
         }
 #endif
 
-    private:
-        struct FindIndexResult
+    protected:
+        struct FindIteratorResult
         {
             bool found;
-            std::vector<CellType>::iterator it;
+            std::vector<CellType>::const_iterator it;
         };
-
-        SizeType order_;
-        std::vector<CellType> data_;
-
-        inline SizeType min_cell_count() const { return (order_ + 1) / 2 - 1; }
-
-        inline SizeType max_cell_count() const { return order_ - 1; }
 
         // Find the index of a key or the position where the key would be inserted if it
         // is not found.
@@ -127,7 +120,7 @@ namespace btreepoc::btree
         // The method returns two values : a boolean indicating if the key was found in
         // the node and the position of the key (if found) or the position it would be (if
         // not found).
-        inline FindIndexResult FindIndex(const TKey& key)
+        inline FindIteratorResult FindIterator(const TKey& key) const
         {
             auto it = std::lower_bound(data_.begin(),
                                        data_.end(),
@@ -138,6 +131,14 @@ namespace btreepoc::btree
             bool found = it != data_.end() && it->key == key;
             return { found, it };
         }
+
+    private:
+        SizeType order_;
+        std::vector<CellType> data_;
+
+        inline SizeType min_cell_count() const { return (order_ + 1) / 2 - 1; }
+
+        inline SizeType max_cell_count() const { return order_ - 1; }
     };
 
 } // namespace btreepoc::btree

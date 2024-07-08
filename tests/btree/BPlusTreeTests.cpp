@@ -6,16 +6,17 @@
 
 namespace btreepoc::btree::tests
 {
+    typedef std::uint32_t KeyType;
+    typedef std::uint32_t ValueType;
+    typedef BPlusTree<KeyType, ValueType> BTreeType;
+    typedef builders::BPlusTreeBuilder<KeyType, ValueType> BuilderType;
+
     TEST_CASE(
       "BTree::Insert When we insert a key/value pair the insertion returns a succes")
     {
-        typedef std::uint32_t KeyType;
-        typedef std::uint32_t ValueType;
-        typedef BPlusTree<KeyType, ValueType> BTreeType;
-
-        const BTreeType::OrderType order = 4;
-        const KeyType key                = 1;
-        const ValueType value            = 2;
+        const BTreeType::SizeType order = 4;
+        const KeyType key               = 1;
+        const ValueType value           = 2;
 
         BTreeType btree(order);
         auto result = btree.Insert(key, value);
@@ -26,10 +27,6 @@ namespace btreepoc::btree::tests
     TEST_CASE(
       "BTree::Insert When we insert the same key twice, the second insertion fails")
     {
-        typedef std::uint32_t KeyType;
-        typedef std::uint32_t ValueType;
-        typedef builders::BPlusTreeBuilder<KeyType, ValueType> BuilderType;
-
         const KeyType key     = 1;
         const ValueType value = 2;
 
@@ -45,14 +42,10 @@ namespace btreepoc::btree::tests
     }
 
     TEST_CASE(
-      "BTreeInsert When we insert multiple key/value pairs with differents keys all insertion succeed")
+      "BTree::Insert When we insert multiple key/value pairs with differents keys all insertion succeed")
     {
-        typedef std::uint32_t KeyType;
-        typedef std::uint32_t ValueType;
-        typedef BPlusTree<KeyType, ValueType> BTreeType;
-
-        const BTreeType::OrderType order = 4;
-        const ValueType value            = 2;
+        const BTreeType::SizeType order = 4;
+        const ValueType value           = 2;
 
         BTreeType btree(order);
 
@@ -83,12 +76,8 @@ namespace btreepoc::btree::tests
     TEST_CASE(
       "BTree::Insert when the root node is full and we add another key/value pair the root should split.")
     {
-        typedef std::uint32_t KeyType;
-        typedef std::uint32_t ValueType;
-        typedef builders::BPlusTreeBuilder<KeyType, ValueType> BuilderType;
-
         BuilderType builder; // clang-format off
-        auto btree = builder.WithOrder(2)
+        auto btree = builder.WithOrder(3)
                             .AddLeafNode()
                                 .AddKeys({ 1, 2 })
                             .EndNode()
@@ -106,6 +95,67 @@ namespace btreepoc::btree::tests
                                .Build(); // clang-format on
 
         btree.Insert(3, 6);
+
+        REQUIRE(expected.CompareKeys(btree));
+    }
+
+    //              Insert 35
+    //                  │
+    //                  ▼
+    //             ┌────┬────┐
+    //      ┌──────┤ 20 │ 40 ├──────┐
+    //      │      └────┼────┘      │
+    //      │           │           │
+    //      ▼           ▼           ▼
+    // ┌────┬────┐ ┌────┬────┐ ┌────┬────┐
+    // │ 10 │ 20 │ │ 30 │ 40 │ │ 50 │    │
+    // └────┴────┘ └────┴────┘ └────┴────┘
+    //
+    //
+    //                Result
+    //                  │
+    //                  ▼
+    //             ┌────┬────┐
+    //      ┌──────┤ 20 │ 35 ├──────┐
+    //      │      └────┼────┘      │
+    //      │           │           │
+    //      ▼           ▼           ▼
+    // ┌────┬────┐ ┌────┬────┐ ┌────┬────┐
+    // │ 10 │ 20 │ │ 30 │ 35 │ │ 40 │ 50 │
+    // └────┴────┘ └────┴────┘ └────┴────┘
+    TEST_CASE(
+      "BPlusTree::Insert When a LeafNodes overflow, it can send a cell to it's right sibling if space is available")
+    {
+        BuilderType builder; // clang-format off
+        auto btree = builder.WithOrder(3)
+                            .AddInternalNode()
+                                .AddLeafNode(20)
+                                    .AddKeys({10, 20})
+                                .EndNode()
+                                .AddLeafNode(40)
+                                    .AddKeys({30, 40})
+                                .EndNode()
+                                .AddLeafNode()
+                                    .AddKeys({50})
+                                .EndNode()
+                            .EndNode()
+                            .Build();
+
+        auto expected = builder.WithOrder(3)
+                                .AddInternalNode()
+                                    .AddLeafNode(20)
+                                        .AddKeys({10, 20})
+                                    .EndNode()
+                                    .AddLeafNode(35)
+                                        .AddKeys({30, 35})
+                                    .EndNode()
+                                    .AddLeafNode()
+                                        .AddKeys({40, 50})
+                                    .EndNode()
+                                .EndNode()
+                                .Build(); // clang-format on
+
+        btree.Insert(35, 70);
 
         REQUIRE(expected.CompareKeys(btree));
     }

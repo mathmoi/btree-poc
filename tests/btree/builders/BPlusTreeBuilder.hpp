@@ -19,7 +19,7 @@ namespace btreepoc::btree::tests::builders
 
         BPlusTreeBuilder() { Init(); }
 
-        inline SelfType& WithOrder(BTreeType::OrderType order)
+        inline SelfType& WithOrder(BTreeType::SizeType order)
         {
             order_ = order;
             return *this;
@@ -82,7 +82,7 @@ namespace btreepoc::btree::tests::builders
         }
 
     private:
-        BTreeType::OrderType order_;
+        BTreeType::SizeType order_;
         std::stack<typename BTreeType::NodePointer> stack_;
         BTreeType::NodePointer current_node_;
 
