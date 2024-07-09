@@ -228,6 +228,73 @@ namespace btreepoc::btree::tests
         REQUIRE(expected.CompareKeys(btree));
     }
 
+    //                             Insert 75
+    //                                 │
+    //                                 ▼
+    //                          ┌────┬────┬────┐
+    //         ┌────────────────┤ 10 │ 30 │ 50 ├──────────────────┐
+    //         │                └──┬─┴────┴──┬─┘                  │
+    //         │                   │         │                    │
+    //         ▼                   ▼         ▼                    ▼
+    // ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐
+    // │ 10 │    │    │ │ 20 │ 30 │    │ │ 40 │ 50 │    │ │ 60 │ 70 │ 80 │
+    // └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘
+    //
+    //
+    //                               Result
+    //                                 │
+    //                                 ▼
+    //                          ┌────┬────┬────┐
+    //         ┌────────────────┤ 10 │ 40 │ 70 ├──────────────────┐
+    //         │                └──┬─┴────┴──┬─┘                  │
+    //         │                   │         │                    │
+    //         ▼                   ▼         ▼                    ▼
+    // ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐
+    // │ 10 │    │    │ │ 20 │ 30 │ 40 │ │ 50 │ 60 │ 70 │ │ 75 │ 80 │    │
+    // └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘
+    TEST_CASE(
+      "BPlusTree::Insert When the overflowing node is the last node of four childre, the last tree nodes are balanced")
+    {
+        BuilderType builder; // clang-format off
+        auto btree = builder.WithOrder(4)
+                            .AddInternalNode()
+                                .AddLeafNode(10)
+                                    .AddKeys({10})
+                                .EndNode()
+                                .AddLeafNode(30)
+                                    .AddKeys({20, 30})
+                                .EndNode()
+                                .AddLeafNode(50)
+                                    .AddKeys({40, 50})
+                                .EndNode()
+                                .AddLeafNode()
+                                    .AddKeys({60, 70, 80})
+                                .EndNode()
+                            .EndNode()
+                            .Build();
+
+        auto expected = builder.WithOrder(4)
+                                .AddInternalNode()
+                                    .AddLeafNode(10)
+                                        .AddKeys({10})
+                                    .EndNode()
+                                    .AddLeafNode(40)
+                                        .AddKeys({20, 30, 40})
+                                    .EndNode()
+                                    .AddLeafNode(70)
+                                        .AddKeys({50, 60, 70})
+                                    .EndNode()
+                                    .AddLeafNode()
+                                        .AddKeys({75, 80})
+                                    .EndNode()
+                                .EndNode()
+                                .Build(); // clang-format on
+
+        btree.Insert(75, 150);
+
+        REQUIRE(expected.CompareKeys(btree));
+    }
+
     // TEST_CASE("BTree::Insert When we insert a key/value pair, we can read it back.")
     // {
     //     typedef std::uint32_t KeyType;
