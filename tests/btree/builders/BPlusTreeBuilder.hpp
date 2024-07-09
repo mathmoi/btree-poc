@@ -76,7 +76,10 @@ namespace btreepoc::btree::tests::builders
 
         inline BTreeType Build()
         {
-            BTreeType result(order_, current_node_);
+            BTreeType result(
+              order_,
+              current_node_ ? current_node_
+                            : std::make_shared<typename BTreeType::LeafNodeType>(order_));
             Init();
             return result;
         }

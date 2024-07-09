@@ -308,7 +308,7 @@ namespace btreepoc::btree::tests
     //         └────┴────┴────┘ └────┴────┴────┘
     //
     //
-    //                     Insert 70
+    //                       Result
     //                         │
     //                         ▼
     //                  ┌────┬────┬────┐
@@ -349,6 +349,49 @@ namespace btreepoc::btree::tests
                                 .Build(); // clang-format on
 
         btree.Insert(70, 140);
+
+        REQUIRE(expected.CompareKeys(btree));
+    }
+
+    //                              Result
+    //                                │
+    //                                ▼
+    //                         ┌────┬────┬────┐
+    //        ┌────────────────┤ 30 │ 60 │ 90 ├──────────────────┐
+    //        │                └──┬─┴────┴──┬─┘                  │
+    //        │                   │         │                    │
+    //        ▼                   ▼         ▼                    ▼
+    // ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐
+    // │ 10 │ 20 │ 30 │ │ 40 │ 50 │ 60 │ │ 70 │ 80 │ 90 │ │100 │110 │120 │
+    // └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘
+    TEST_CASE(
+      "BPlusTree::Insert a B*+Tree of order 4 should have four full leaf nodes and one internal node if we add the keys 12 keys sequentially.")
+    {
+        BuilderType builder; // clang-format off
+        auto btree = builder.WithOrder(4)
+                            .Build();
+
+        auto expected = builder.WithOrder(4)
+                                .AddInternalNode()
+                                    .AddLeafNode(30)
+                                        .AddKeys({10, 20, 30})
+                                    .EndNode()
+                                    .AddLeafNode(60)
+                                        .AddKeys({40, 50, 60})
+                                    .EndNode()
+                                    .AddLeafNode(90)
+                                        .AddKeys({70, 80, 90})
+                                    .EndNode()
+                                    .AddLeafNode()
+                                        .AddKeys({100, 110, 120})
+                                    .EndNode()
+                                .EndNode()
+                                .Build(); // clang-format on
+
+        for(KeyType key = 10; key <= 120; key += 10)
+        {
+            btree.Insert(key, key * 2);
+        }
 
         REQUIRE(expected.CompareKeys(btree));
     }
