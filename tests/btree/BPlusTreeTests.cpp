@@ -295,6 +295,64 @@ namespace btreepoc::btree::tests
         REQUIRE(expected.CompareKeys(btree));
     }
 
+    //                    Insert 70
+    //                        │
+    //                        ▼
+    //                 ┌────┬────┬────┐
+    //                 │ 30 │    │    │
+    //                 └──┬─┴────┴──┬─┘
+    //                    │         │
+    //                    ▼         ▼
+    //         ┌────┬────┬────┐ ┌────┬────┬────┐
+    //         │ 10 │ 20 │ 30 │ │ 40 │ 50 │ 60 │
+    //         └────┴────┴────┘ └────┴────┴────┘
+    //
+    //
+    //                     Insert 70
+    //                         │
+    //                         ▼
+    //                  ┌────┬────┬────┐
+    //        ┌─────────┤ 30 │ 50 │    ├────────┐
+    //        │         └────┴─┬──┴────┘        │
+    //        │                │                │
+    //        ▼                ▼                ▼
+    // ┌────┬────┬────┐ ┌────┬────┬────┐ ┌────┬────┬────┐
+    // │ 10 │ 20 │ 30 │ │ 40 │ 50 │    │ │ 60 │ 70 │    │
+    // └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘
+    TEST_CASE(
+      "BPlusTree::Insert Leaf node should split when keys can't be moved around siblings")
+    {
+        BuilderType builder; // clang-format off
+        auto btree = builder.WithOrder(4)
+                            .AddInternalNode()
+                                .AddLeafNode(30)
+                                    .AddKeys({10, 20, 30})
+                                .EndNode()
+                                .AddLeafNode()
+                                    .AddKeys({40, 50, 60})
+                                .EndNode()
+                            .EndNode()
+                            .Build();
+
+        auto expected = builder.WithOrder(4)
+                                .AddInternalNode()
+                                    .AddLeafNode(30)
+                                        .AddKeys({10, 20, 30})
+                                    .EndNode()
+                                    .AddLeafNode(50)
+                                        .AddKeys({40, 50})
+                                    .EndNode()
+                                    .AddLeafNode()
+                                        .AddKeys({60, 70})
+                                    .EndNode()
+                                .EndNode()
+                                .Build(); // clang-format on
+
+        btree.Insert(70, 140);
+
+        REQUIRE(expected.CompareKeys(btree));
+    }
+
     // TEST_CASE("BTree::Insert When we insert a key/value pair, we can read it back.")
     // {
     //     typedef std::uint32_t KeyType;
