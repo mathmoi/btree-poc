@@ -365,7 +365,7 @@ namespace btreepoc::btree::tests
     // │ 10 │ 20 │ 30 │ │ 40 │ 50 │ 60 │ │ 70 │ 80 │ 90 │ │100 │110 │120 │
     // └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘ └────┴────┴────┘
     TEST_CASE(
-      "BPlusTree::Insert a B*+Tree of order 4 should have four full leaf nodes and one internal node if we add the keys 12 keys sequentially.")
+      "BPlusTree::Insert a B*+Tree of order 4 should have four full leaf nodes and one internal node if we add the keys 12 keys sequentially")
     {
         BuilderType builder; // clang-format off
         auto btree = builder.WithOrder(4)
@@ -392,6 +392,79 @@ namespace btreepoc::btree::tests
         {
             btree.Insert(key, key * 2);
         }
+
+        REQUIRE(expected.CompareKeys(btree));
+    }
+
+    //              Insert 35
+    //                  │
+    //                  ▼
+    //             ┌────┬────┐
+    //      ┌──────┤ 20 │ 40 ├──────┐
+    //      │      └────┼────┘      │
+    //      │           │           │
+    //      ▼           ▼           ▼
+    // ┌────┬────┐ ┌────┬────┐ ┌────┬────┐
+    // │ 10 │ 20 │ │ 30 │ 40 │ │ 50 │ 60 │
+    // └────┴────┘ └────┴────┘ └────┴────┘
+    //
+    //
+    //                      Result
+    //                        │
+    //                        ▼
+    //                   ┌────┬────┐
+    //            ┌──────┤ 35 │    ├──────┐
+    //            │      └────┴────┘      │
+    //            │                       │
+    //            ▼                       ▼
+    //       ┌────┬────┐             ┌────┬────┐
+    //     ┌─┤ 20 │    ├─┐         ┌─┤ 50 │    ├─┐
+    //     │ └────┴────┘ │         │ └────┴────┘ │
+    //     │             │         │             │
+    //     ▼             ▼         ▼             ▼
+    // ┌────┬────┐ ┌────┬────┐ ┌────┬────┐ ┌────┬────┐
+    // │ 10 │ 20 │ │ 30 │ 35 │ │ 40 │ 50 │ │ 60 │    │
+    // └────┴────┘ └────┴────┘ └────┴────┘ └────┴────┘
+    TEST_CASE(
+      "BPlusTree::Insert When a leaf node split and cause the parent to overflow the parent should split as well")
+    {
+        BuilderType builder; // clang-format off
+        auto btree = builder.WithOrder(3)
+                            .AddInternalNode()
+                                .AddLeafNode(20)
+                                    .AddKeys({10, 20})
+                                .EndNode()
+                                .AddLeafNode(40)
+                                    .AddKeys({30, 40})
+                                .EndNode()
+                                .AddLeafNode()
+                                    .AddKeys({50, 60})
+                                .EndNode()
+                            .EndNode()
+                            .Build();
+
+        auto expected = builder.WithOrder(3)
+                                .AddInternalNode()
+                                    .AddInternalNode(35)
+                                        .AddLeafNode(20)
+                                            .AddKeys({10, 20})
+                                        .EndNode()
+                                        .AddLeafNode()
+                                            .AddKeys({30, 35})
+                                        .EndNode()
+                                    .EndNode()
+                                    .AddInternalNode()
+                                        .AddLeafNode(50)
+                                            .AddKeys({40, 50})
+                                        .EndNode()
+                                        .AddLeafNode()
+                                            .AddKeys({60})
+                                        .EndNode()
+                                    .EndNode()
+                                .EndNode()
+                                .Build(); // clang-format on
+
+        btree.Insert(35, 70);
 
         REQUIRE(expected.CompareKeys(btree));
     }

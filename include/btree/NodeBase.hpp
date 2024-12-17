@@ -19,6 +19,9 @@ namespace btreepoc::btree
         // Type for the size of a node.
         typedef std::uint32_t SizeType;
 
+        // Type for the keys in this node type.
+        typedef TKey KeyType;
+
         // Type of the cells stored in the node
         typedef Cell<TKey, TValue> CellType;
 

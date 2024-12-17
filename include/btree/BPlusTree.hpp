@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <stack>
+#include <type_traits>
 #include <utility>
 
 namespace btreepoc::btree
@@ -111,27 +112,42 @@ namespace btreepoc::btree
         }
 
         // Create a copy of all the cell in the nodes we will need to balance.
-        inline std::vector<typename LeafNodeType::CellType>
+        template<typename NodeType>
+        inline std::vector<typename NodeType::CellType>
           CopyCellsBalance(InternalNodePointer parent,
                            std::int32_t first_index,
                            std::int32_t last_index)
         {
-            std::vector<typename LeafNodeType::CellType> cells;
+            std::vector<typename NodeType::CellType> cells;
             for(auto sibling_index = first_index; sibling_index <= last_index;
                 ++sibling_index)
             {
-                LeafNodePointer sibling;
                 if(sibling_index < static_cast<std::int32_t>(parent->size()))
                 {
-                    sibling = std::static_pointer_cast<LeafNodeType>(
-                      (*parent)[sibling_index].value);
+                    auto sibling =
+                      std::static_pointer_cast<NodeType>((*parent)[sibling_index].value);
+                    std::copy(sibling->begin(),
+                              sibling->end(),
+                              std::back_inserter(cells));
+                    if constexpr(std::is_same_v<NodeType, InternalNodeType>)
+                    {
+                        cells.push_back({ (*parent)[sibling_index].key,
+                                          sibling->right_most_pointer() });
+                    }
                 }
                 else
                 {
-                    sibling = std::static_pointer_cast<LeafNodeType>(
-                      parent->right_most_pointer());
+                    auto sibling =
+                      std::static_pointer_cast<NodeType>(parent->right_most_pointer());
+                    std::copy(sibling->begin(),
+                              sibling->end(),
+                              std::back_inserter(cells));
+                    if constexpr(std::is_same_v<NodeType, InternalNodeType>)
+                    {
+                        cells.push_back(
+                          { .key = {}, .value = sibling->right_most_pointer() });
+                    }
                 }
-                std::copy(sibling->begin(), sibling->end(), std::back_inserter(cells));
             }
             return cells;
         }
@@ -154,9 +170,11 @@ namespace btreepoc::btree
         }
 
         // Calculate how many node is needed to store a given amount of cells.
-        inline SizeType CalculateNumberNodesAfterBalance(SizeType cells_count)
+        inline SizeType CalculateNumberNodesAfterBalance(SizeType cells_count,
+                                                         bool is_leaf)
         {
-            return (cells_count + order_ - 2) / (order_ - 1);
+            auto cells_per_node = order_ - (is_leaf ? 1 : 0);
+            return (cells_count + cells_per_node - 1) / cells_per_node;
         }
 
         // Calculate the number of cells at a node after balancing. We try to have the
@@ -186,14 +204,18 @@ namespace btreepoc::btree
             return new_root;
         }
 
+        // TODO : parents should probably be a reference
+
         // This methods balance the tree after an insertion or a deletion. It is higly
         // inspired by Antonio Sarosi's implementation of mkdb.
         //
         // https://github.com/antoniosarosi/mkdb/blob/master/src/storage/btree.rs
-        //
-        inline void Balance(LeafNodePointer node, std::stack<InternalNodePointer> parents)
+        template<typename NodeType>
+        inline void Balance(std::shared_ptr<NodeType> node,
+                            std::stack<InternalNodePointer> parents)
         {
-            bool is_root = parents.empty();
+            constexpr bool is_leaf = std::is_same_v<NodeType, LeafNodeType>;
+            const bool is_root     = parents.empty();
 
             if(is_root)
             {
@@ -220,22 +242,39 @@ namespace btreepoc::btree
             bool must_restore_right_most = last_sibling_index == parent->size();
 
             auto cells =
-              CopyCellsBalance(parent, first_sibling_index, last_sibling_index);
+              CopyCellsBalance<NodeType>(parent, first_sibling_index, last_sibling_index);
             RemoveChildFromParentBeforeBalance(parent,
                                                first_sibling_index,
                                                last_sibling_index);
-            SizeType num_nodes = CalculateNumberNodesAfterBalance(cells.size());
+            SizeType num_nodes = CalculateNumberNodesAfterBalance(cells.size(), is_leaf);
 
             // Create new nodes add cells in them and insert them into the parent.
             auto next_cell = cells.begin();
             for(auto node_index = 0u; node_index < num_nodes; ++node_index)
             {
+                TKey last_key;
                 auto cells_at_node =
                   CalculateCellsAtNodeBalance(cells.size(), num_nodes, node_index);
-                auto new_node = std::make_shared<LeafNodeType>(order_);
-                for(auto x = 0u; x < cells_at_node; ++x)
+                auto new_node = std::make_shared<NodeType>(order_);
+                for(auto x = 0u; x < cells_at_node;
+                    ++x) // TODO : Can we extract the last iteration from the loop?
                 {
-                    new_node->Insert(*(next_cell++));
+                    if(x < cells_at_node - 1)
+                    {
+                        new_node->Insert(*(next_cell++));
+                    }
+                    else
+                    {
+                        last_key = next_cell->key;
+                        if constexpr(is_leaf)
+                        {
+                            new_node->Insert(*(next_cell++));
+                        }
+                        else
+                        {
+                            new_node->set_right_most_pointer((next_cell++)->value);
+                        }
+                    }
                 }
 
                 // Insert the node in the parents. If must_restore_right_most is true the
@@ -243,13 +282,17 @@ namespace btreepoc::btree
                 // inserted.
                 if(node_index < num_nodes - 1 || !must_restore_right_most)
                 {
-                    parent->Insert({ new_node->back().key, new_node });
+                    parent->Insert({ last_key, new_node });
                 }
                 else
                 {
                     parent->set_right_most_pointer(new_node);
                 }
             }
+
+            // Continue up the tree
+            parents.pop();
+            Balance(parent, parents);
         }
     };
 } // namespace btreepoc::btree
