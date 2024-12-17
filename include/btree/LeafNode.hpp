@@ -1,80 +1,52 @@
-#ifndef BTREE_LEAF_NODE_HPP_
-#define BTREE_LEAF_NODE_HPP_
+#ifndef BTREE_POC_BTREE_LEAF_NODE_HPP_
+#define BTREE_POC_BTREE_LEAF_NODE_HPP_
 
-#include "Node.hpp"
+#include "INode.hpp"
+#include "NodeBase.hpp"
 
-#include <memory>
-
-namespace btree
+namespace btreepoc::btree
 {
-    template<typename TKey, typename TValue, const int order>
-    class LeafNode : public Node<TKey, order>
+    // This class represents a leaf node in a B+tree
+    template<typename TKey, typename TValue>
+    class LeafNode : public INode, public NodeBase<TKey, TValue>
     {
     public:
-        typedef std::array<std::pair<TKey, TValue>, Node<TKey, order>::MAX_KEYS>
-          ItemsArray;
+        typedef NodeBase<TKey, TValue> Base;
 
-        LeafNode()
-        : Node<TKey, order>(true),
-          next_(nullptr)
+        // Constructor.
+        inline LeafNode(Base::SizeType order)
+        : Base(order)
         {
         }
 
-        void Insert(const TKey& key, const TValue& value)
+        // Indicate if this node is a leaf node.
+        inline bool is_leaf() const { return true; };
+
+        // Indicate if the node is underflowing (has less cells than allowed for a node in
+        // a balanced tree)
+        inline bool underflow() const { return Base::underflow(); }
+
+        // Indicate if the node is overflowing (has more cells than allowed for a node in
+        // a balanced tree)
+        inline bool overflow() const { return Base::overflow(); }
+
+#ifdef BTREE_POC_UNIT_TESTS
+        // Compare the keys of this node and an other node. This method is available only
+        // for unit tests.
+        //
+        // Returns true if they are equivalent, false otherwise.
+        bool CompareKeys(const INode& other)
         {
-            auto [index, found] = this->SearchKeyIndex(key);
-            if(!found)
+            auto other_leaf = dynamic_cast<const LeafNode<TKey, TValue>*>(&other);
+            if(!other_leaf)
             {
-                std::copy_backward(items_.begin() + index,
-                                   items_.begin() + this->items_count_,
-                                   items_.begin() + this->items_count_ + 1);
-                ++this->items_count_;
+                return false;
             }
-            items_[index] = std::make_pair(key, value);
-        }
 
-        TKey GetKeyAt(std::uint32_t index)
-        {
-            assert(index < this->items_count_);
-            return items_[index].first;
-        }
-
-        std::pair<TKey, std::shared_ptr<LeafNode<TKey, TValue, order>>> Split()
-        {
-            std::shared_ptr<LeafNode<TKey, TValue, order>> new_leaf =
-              std::make_shared<LeafNode<TKey, TValue, order>>();
-            auto mid_index = this->items_count_ / 2;
-            TKey mid_key   = items_[mid_index].first;
-
-            std::copy(items_.begin() + mid_index, items_.end(), new_leaf->items_.begin());
-            new_leaf->items_count_ = this->items_count_ - mid_index;
-            this->items_count_     = mid_index;
-
-            new_leaf->next_ = next_;
-            next_           = new_leaf.get();
-
-            return std::make_pair(mid_key, new_leaf);
-        }
-
-        void Print(std::ostream& out) const
-        {
-            out << "node" << this->id() << " [label=\"";
-            for(std::uint32_t x = 0; x < this->items_count_; ++x)
-            {
-                out << "<f" << x << "> " << items_[x].first << ':' << items_[x].second
-                    << ' ';
-                if(x < this->items_count_ - 1)
-                {
-                    out << '|';
-                }
-            }
-            out << "\"];\n";
-        }
-
-    private:
-        ItemsArray items_;
-        LeafNode<TKey, TValue, order>* next_;
+            return Base::CompareKeys(*static_cast<const Base*>(other_leaf));
+        };
+#endif
     };
-} // namespace btree
+} // namespace btreepoc::btree
 
-#endif // BTREE_LEAF_NODE_HPP_
+#endif // BTREE_POC_BTREE_LEAF_NODE_HPP_

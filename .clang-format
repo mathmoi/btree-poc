@@ -57,14 +57,16 @@ UseTab: Never
 BraceWrapping:
   SplitEmptyFunction: 'false'
 IncludeCategories:
-  - Regex: '^".*"$'
+  - Regex: '^[<"]btree.*[>"]$'
     Priority: 1
-  - Regex: '^(<|")catch2.*(>|")$'
+  - Regex: '^".*"$'
     Priority: 2
-  - Regex: '^<.*\.h>$'
+  - Regex: '^(<|")catch2.*(>|")$'
     Priority: 3
-  - Regex: '^<.*>$'
+  - Regex: '^<.*\.h>$'
     Priority: 4
-  - Regex: '.*'
+  - Regex: '^<.*>$'
     Priority: 5
+  - Regex: '.*'
+    Priority: 6
 IncludeIsMainRegex: "(Tests)?$"

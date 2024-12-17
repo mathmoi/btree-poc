@@ -14,6 +14,8 @@ target_link_libraries(btree-tests PRIVATE Catch2::Catch2WithMain
                                           btree)
 add_dependencies(btree-tests btree)
 
+target_compile_definitions(btree-tests PRIVATE BTREE_POC_UNIT_TESTS)
+
 # Configure CTest
 include(CTest)
 include(Catch)
